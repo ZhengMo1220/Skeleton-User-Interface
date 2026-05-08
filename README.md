@@ -155,21 +155,23 @@ python -c "from ultralytics import YOLO; print('YOLO OK')"
 
 ## 模型準備
 
-將以下模型檔案放至 `Db/pretrain/` 資料夾（請向專案負責人索取 Google Drive 連結）：
+模型權重檔因體積過大（合計約 1.2 GB）無法上傳至 GitHub，請從以下 Google Drive 下載：
+
+**[點此下載模型檔案](https://drive.google.com/drive/folders/1FJDGG1D4qhj-ivjHMgmz0nLkM_zeKDjX?usp=drive_link)**
 
 | 檔案名稱 | 用途 | 大小（約）|
 |---------|------|---------|
 | `epoch_210.pth` | ViTPose 姿態估計模型（HALPE 26 關節點） | ~1.1 GB |
 | `yolo11m-seg.pt` | YOLOv11 人體偵測模型 | ~45 MB |
 
-下載後目錄結構應如下：
+下載後，將兩個檔案放至專案的 `Db/pretrain/` 資料夾（若不存在請手動建立）：
 
 ```
-Hitter-Skeleton-User-Interface/
+Skeleton-User-Interface/
 ├── Db/
 │   ├── pretrain/
-│   │   ├── epoch_210.pth        ← ViTPose 模型
-│   │   └── yolo11m-seg.pt       ← YOLOv11 模型
+│   │   ├── epoch_210.pth        ← 下載後放這裡
+│   │   └── yolo11m-seg.pt       ← 下載後放這裡
 │   └── Record/                  ← 輸出資料夾（自動建立）
 └── Src/
 ```
