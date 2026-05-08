@@ -8,6 +8,11 @@ from PyQt5.QtWidgets import QGraphicsScene
 from utils.vis_image import ImageDrawer
 from cv_utils.cv_thread import VideoCaptureThread, VideoWriterThread, VideoToImagesThread
 from PyQt5.QtWidgets import *
+try:
+    import EasyPySpin
+    _has_easypyspin = True
+except ImportError:
+    _has_easypyspin = False
 
 class Camera:
     def __init__(self, camera_idx:int = 0):
@@ -15,11 +20,11 @@ class Camera:
         self.is_opened = False
         self.frame_count = 0
         self.fps_control = 1
-        self.frame_size = None
         self.frame_buffer = queue.Queue()
         self.video_path = None
         self.video_writer = None
         self.video_thread = None
+        self.frame_size=None
 
     def open_camera(self):
         # 開啟相機，並設置回調來處理每一幀
@@ -40,18 +45,19 @@ class Camera:
             self.video_writer.release()
             self.video_writer = None
 
-    def toggleCamera(self, is_checked:bool):
+    def toggle_camera(self, is_checked:bool):
         # 根據checkbox狀態切換相機
         if is_checked:
             self.open_camera()
             frame_width = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             frame_height = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            fps = int(self.video_thread.cap.get(cv2.CAP_PROP_FPS))
-            self.frame_size = (frame_width, frame_height)
+            # fps = int(self.video_thread.cap.get(cv2.CAP_PROP_FPS))
+            fps = int(self.video_thread.cap.get_pyspin_value("AcquisitionFrameRate"))
+            self.frame_size=(frame_width,frame_height)
             return (frame_width, frame_height, fps)
         else:
             self.close_camera()
-            self.frame_size = None
+            self.frame_size=None
             return (0, 0, 0)
 
     def buffer_frame(self, frame:np.ndarray):
@@ -64,15 +70,15 @@ class Camera:
         if self.video_writer is not None and self.video_writer.is_writing:
             self.video_writer.write_frame(frame)
 
-    def startRecording(self, filename: str):
+    def start_recording(self, filename: str):
         # 開始錄製影片
         if self.video_thread is None:
             return
         frame_width = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = int(self.video_thread.cap.get(cv2.CAP_PROP_FPS))
+        fps = int(self.video_thread.cap.get_pyspin_value("AcquisitionFrameRate"))
+        # fps = int(self.video_thread.cap.get(cv2.CAP_PROP_FPS))
         self.video_path = filename
-
         self.video_writer = VideoWriterThread(filename, frame_width, frame_height, fps=fps)
         self.video_writer.start_writing()
 
@@ -82,11 +88,10 @@ class Camera:
             self.video_writer.stop_writing()  # 停止寫入
             self.video_writer.release()  # 釋放執行緒
 
-    def setCameraId(self, new_idx: int):
+    def set_camera_idx(self, new_idx: int):
         self.camera_idx = new_idx
-        print(f'camera id: {self.camera_idx}')
 
-    def setFPSControl(self, fps:int):
+    def set_fps_control(self, fps:int):
         self.fps_control = fps
 
 class DataType(Enum):
@@ -109,6 +114,8 @@ class VideoLoader:
         self.video_frames = None
         self.total_frames = None
         self.video_name = None
+        self.bat_json_name = None
+        self.swingData_json_name = None
         self.is_loading = False
     
     def loadVideo(self, video_path:str = None):
@@ -124,6 +131,7 @@ class VideoLoader:
         self.v_t = VideoToImagesThread(self.video_path)
         self.v_t.emit_signal.connect(self.video_to_frame)
         self.v_t.start()
+
 
     def video_to_frame(self, video_frames, fps, count):
         self.total_frames = count
@@ -141,28 +149,31 @@ class VideoLoader:
     def getVideoImage(self, frame_num:int) -> np.ndarray:
         return self.video_frames[frame_num].copy()
     
-    def saveVideo(self):
+    def saveVideo(self, process:bool):
         output_folder = os.path.join("../../Db/Record", self.video_name)
         os.makedirs(output_folder, exist_ok=True)
 
         json_path = os.path.join(output_folder, f"{self.video_name}.json")
 
         save_person_df = self.image_drawer.pose_estimater.person_df
-
         save_person_df.to_json(json_path, orient='records')
 
-        save_location = os.path.join(output_folder, f"{self.video_name}_Sk26.mp4")
-
+        if process:
+            save_location = os.path.join(output_folder, f"{self.video_name}_Sk26.mp4")
+        else: save_location = os.path.join(output_folder, f"{self.video_name}.mp4")
         video_writer = cv2.VideoWriter(save_location, cv2.VideoWriter_fourcc(*'mp4v'), self.video_fps, self.video_size)
 
         if not video_writer.isOpened():
             print("Error while opening video writer!")
             return
-
-        for frame_num, frame in enumerate(self.video_frames):
-            image = self.image_drawer.drawInfo(img = frame, frame_num = frame_num)
-            video_writer.write(image)
-
+        if process:
+            for frame_num, frame in enumerate(self.video_frames):
+                image = self.image_drawer.drawInfo(img = frame, frame_num = frame_num)
+                video_writer.write(image)
+        else:
+            for frame_num, frame in enumerate(self.video_frames):
+                # image = self.image_drawer.drawInfo(img = frame, frame_num = frame_num)
+                video_writer.write(frame)
         video_writer.release()
         print("Store video success")
 
@@ -181,14 +192,19 @@ class JsonLoader:
         self.folder_path = folder_path
         self.file_name = file_name
         self.person_df = pd.DataFrame()
+        self.bat_df = pd.DataFrame()
+        self.SwingData_df = pd.DataFrame()
 
-    def load(self) -> pd.DataFrame:
+    def load(self):
         if self.folder_path == None or self.file_name == None:
-            return
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
         json_path = os.path.join(self.folder_path, f"{self.file_name}.json")
-        print(json_path)
-
+        bat_json_path = os.path.join(self.folder_path, f"{self.file_name}_bat.json")
+        swingData_json_path = os.path.join(self.folder_path, f"{self.file_name}_SwingData.json")
         if not os.path.exists(json_path):
-            return
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
         
         self.person_df = pd.read_json(json_path)
+        self.bat_df = pd.read_json(bat_json_path)
+        self.SwingData_df = pd.read_json(swingData_json_path)
+        return self.person_df, self.bat_df, self.SwingData_df

@@ -36,10 +36,10 @@ class VideoToImagesThread(QThread):
         return video_images, fps, count
 
     def run(self):
-        # capture from web cam
-        video_images, fps, count= self.video_to_frame(self.video_path)
-        _run_flag=False
+        video_images, fps, count = self.video_to_frame(self.video_path)
+        self._run_flag = False
         self.emit_signal.emit(video_images, fps, count)
+        
     def stop(self):
         """Sets run flag to False and waits for thread to finish"""
         self._run_flag = False
@@ -50,15 +50,28 @@ class VideoToImagesThread(QThread):
     def isFinished(self):
         print(" finish thread")
 
+try:
+    import EasyPySpin
+    _has_easypyspin = True
+except ImportError:
+    _has_easypyspin = False
+
 class VideoCaptureThread(QThread):
     frame_ready = pyqtSignal(np.ndarray)
 
     def __init__(self, parent=None, camera_index=0):
         super().__init__(parent)
-        self.cap = cv2.VideoCapture(camera_index)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-        self.cap.set(cv2.CAP_PROP_FPS, 60)
+        self.cap = EasyPySpin.VideoCapture(0)
+        self.cap.set(cv2.CAP_PROP_EXPOSURE, -1)
+        self.cap.set(cv2.CAP_PROP_GAIN, -1)
+        self.cap.set_pyspin_value("PixelFormat", "BayerRG8")
+        self.cap.set_pyspin_value("AcquisitionMode", 0)
+        self.cap.set_pyspin_value("ExposureAuto", "Off")
+        # self.cap.set_pyspin_value("ExposureTime", 1000.0)
+        self.cap.set_pyspin_value("TriggerMode", "Off")
+        self.cap.set_pyspin_value("AcquisitionFrameRate", 160.0)
+        self.cap.set_pyspin_value("AcquisitionFrameRateControlEnabled", "False")
+        print(self.cap.get_pyspin_value("AcquisitionFrameRate"))
         if not self.cap.isOpened():
             raise ValueError(f"Cannot open camera with index {camera_index}")
         self.running = False
@@ -73,15 +86,17 @@ class VideoCaptureThread(QThread):
         self.wait()
 
     def run(self):
+        count = 0
         while self.running:     
             ret, frame = self.cap.read()
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BayerBG2BGR)
             if ret:
-                # if count % 6 ==0:
-                self.frame_ready.emit(frame)  # 發送影像
+                if count % 3 ==0:
+                    self.frame_ready.emit(rgb_frame)  # 發送影像
             else:  # 例外處理
                 print("Warning: Failed to capture frame")
                 break
-
+            count +=1
         self.cap.release()
 
 class VideoWriterThread(QThread):

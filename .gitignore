@@ -163,3 +163,16 @@ cython_debug/
 Db
 Src/mmpose_main/work_dirs
 Src/mmpose_main/data
+.vscode/
+Src/UI_Control/cv_utils/cv_control_dual.py
+Src/UI_Control/cv_utils/cv_thread_dual.py
+Src/UI_Control/cv_utils/cv_thread_origin.py
+Src/UI_Control/testing.ui
+Src/UI_Control/testing_ui.py
+Src/cython-bbox/
+Src/UI_Control/ui/hitter_*
+Src/UI_Control/ui/pitch_*
+Src/UI_Control/ui/baseball_*
+Src/UI_Control/ui/video_ui_v1.ui
+Src/UI_Control/ui/widget3d.py
+Src/UI_Control/ui/camera_ui.*

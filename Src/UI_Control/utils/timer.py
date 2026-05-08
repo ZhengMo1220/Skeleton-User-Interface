@@ -47,7 +47,7 @@ class Timer:
         if (diff_time) < self.duration:
             return False
         return True
-    
+        
     def get_remaining_time(self):
         """返回剩餘的倒數時間"""
         if self.start_time is None:
