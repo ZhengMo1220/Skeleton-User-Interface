@@ -3,7 +3,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
-from skeleton.detect_skeleton import PoseEstimater
 import os
 import sys
 
@@ -23,7 +22,7 @@ else:
     application_path = os.path.dirname(__file__)
 
 class ImageDrawer():
-    def __init__(self, pose_estimater: PoseEstimater=None):
+    def __init__(self, pose_estimater=None):
         self.font_path = os.path.join(application_path, 'R-PMingLiU-TW-2.ttf')
         self.fontStyle = ImageFont.truetype(self.font_path, 20)
         self.pose_estimater = pose_estimater
@@ -36,11 +35,12 @@ class ImageDrawer():
         self.region = [(100, 250), (450, 600)]
 
 
-    def drawInfo(self, img:np.ndarray, frame_num:int=None, kpt_buffer:list = None, countdown_time:int = None):
+    def drawInfo(self, img:np.ndarray, frame_num:int=None, kpt_buffer:list = None, countdown_time:int = None,
+                 show_bbox=None, show_skeleton=None, is_select:bool=True):
         if img is None:
             return
         image = img.copy()
-        curr_person_df = self.pose_estimater.getPersonDf(frame_num = frame_num, is_select=True)
+        curr_person_df = self.pose_estimater.getPersonDf(frame_num = frame_num, is_select=is_select)
         if self.show_region:
             image = self.drawRegion(image)
 
@@ -53,11 +53,12 @@ class ImageDrawer():
         if self.show_grid :
             image = self.drawGrid(image)
 
-        if self.show_bbox:
+        if (self.show_bbox if show_bbox is None else show_bbox):
             image = self.drawBbox(image, curr_person_df)
 
-        if self.show_skeleton:
-            image = self.drawPointsandSkeleton(image, curr_person_df, self.pose_estimater.joints['haple']['skeleton_links'], points_palette_samples=10)
+        if (self.show_skeleton if show_skeleton is None else show_skeleton):
+            layout = getattr(self.pose_estimater, 'layout', 'haple')
+            image = self.drawPointsandSkeleton(image, curr_person_df, self.pose_estimater.joints[layout]['skeleton_links'], points_palette_samples=10)
 
         return image
 
@@ -137,8 +138,9 @@ class ImageDrawer():
             colors = np.round(
                 np.array(plt.get_cmap(color_palette)(np.linspace(0, 1, palette_samples))) * 255
             ).astype(np.uint8)[:, -2::-1].tolist()
-        right_skeleton = self.pose_estimater.joints['haple']['right_points_indices']
-        left_skeleton = self.pose_estimater.joints['haple']['left_points_indices']
+        layout = getattr(self.pose_estimater, 'layout', 'haple')
+        right_skeleton = self.pose_estimater.joints[layout]['right_points_indices']
+        left_skeleton = self.pose_estimater.joints[layout]['left_points_indices']
 
         for i, joint in enumerate(skeleton):
             pt1, pt2 = points[joint]
